@@ -7,7 +7,7 @@ module.exports = async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
 
     let timeData = { datetime: null, date: null, time: null };
-    let marketStatus = "Closed";
+    let marketStatus = "null";
     let set = "-";
     let value = "-";
     let twod = "-";
@@ -29,7 +29,7 @@ module.exports = async (req, res) => {
         }
     } catch (e) {}
 
-    // --- ၂။ နည်းလမ်း (က) - မူလ SET Home Page ကနေ ဒေတာဆွဲခြင်း ---
+    // --- ၂။ နည်းလမ်း (၁) - မူလ SET Home Page ကနေ ဒေတာဆွဲခြင်း ---
     let success = false;
     try {
         const response = await axios.get('https://www.set.or.th/en/home', { headers, timeout: 6000 });
@@ -47,7 +47,7 @@ module.exports = async (req, res) => {
             }
         });
 
-        // Table rows ထဲက SET Index ဒေတာ ရှာဖွေခြင်း
+        // Table rows ထဲက SET value ဒေတာ ရှာဖွေခြင်း
         $('tr').each((i, el) => {
             const indexTd = $(el).find('td.title-symbol');
             if (indexTd.length > 0 && indexTd.text().trim() === 'SET') {
@@ -65,14 +65,14 @@ module.exports = async (req, res) => {
         success = false;
     }
 
-    // --- ၃။ နည်းလမ်း (ခ) - မရခဲ့လျှင် Overview Page ကနေ Backup ဆွဲခြင်း ---
+    // --- ၃။ နည်းလမ်း (၂) - ၁ မရခဲ့လျှင် Overview Page ကနေ Backup ဆွဲခြင်း ---
     if (!success || set === "-" || value === "-") {
         try {
             const backupUrl = 'https://www.set.or.th/en/market/index/set/overview';
             const response = await axios.get(backupUrl, { headers, timeout: 6000 });
             const $ = cheerio.load(response.data);
 
-            // SET Value ကို ယူခြင်း
+            // SET ကိုယူခြင်း
             const setBox = $('.stock-info, .value.stock-info');
             if (setBox.length > 0) {
                 set = setBox.first().text().trim();
@@ -114,7 +114,7 @@ module.exports = async (req, res) => {
 
     // --- ၅။ ရလဒ်ကို ပေးပို့ခြင်း ---
     return res.status(200).json({
-        data_from: dataSource, // ဘယ်လင့်ခ်ကနေ ဒေတာရလဲဆိုတာ ပြပေးမယ့် Key အသစ်
+        data_source: dataSource, // ဘယ်လင့်ခ်ကနေ ဒေတာရလဲဆိုတာ ပြပေးမယ့် Key အသစ်
         status: marketStatus,
         set: set,
         value: value,
