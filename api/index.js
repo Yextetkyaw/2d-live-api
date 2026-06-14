@@ -2,7 +2,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const { Redis } = require('@upstash/redis');
 
-// Vercel Integration က ဆောက်ပေးလိုက်တဲ့ KV_REST_API_URL နှင့် KV_REST_API_TOKEN ကို သုံးပြီး ချိတ်ဆက်ခြင်း
+// Upstash Redis Connection
 const redis = new Redis({
     url: process.env.KV_REST_API_URL,
     token: process.env.KV_REST_API_TOKEN,
@@ -23,6 +23,7 @@ module.exports = async (req, res) => {
     let hasHistory = false;
     let historyList = [];
     
+    // ၁။ ဒေတာ မရှိသေးတဲ့အချိန် (null ဖြစ်နေချိန်) မှာ ပြသမည့် Default ပုံစံ
     const defaultResult = {
         set: "--",
         value: "--",
@@ -40,7 +41,7 @@ module.exports = async (req, res) => {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     };
 
-    // ၁။ Time API ကနေ ဒေတာဆွဲခြင်း
+    // Time API မှ ဒေတာဆွဲခြင်း
     try {
         const timeResponse = await axios.get('https://time-api-42d.vercel.app/api/time', { timeout: 4000 });
         if (timeResponse.status === 200) {
@@ -52,7 +53,7 @@ module.exports = async (req, res) => {
         }
     } catch (e) {}
 
-    // ၂။ SET Home Page မှ ဒေတာဆွဲခြင်း
+    // SET Home Page မှ ဒေတာဆွဲခြင်း
     let success = false;
     try {
         const response = await axios.get('https://www.set.or.th/en/home', { headers, timeout: 6000 });
@@ -81,7 +82,7 @@ module.exports = async (req, res) => {
         });
     } catch (e) { success = false; }
 
-    // ၃။ Backup အဖြစ် Overview Page မှ ဆွဲခြင်း
+    // Backup အဖြစ် Overview Page မှ ဆွဲခြင်း
     if (!success || set === "-" || value === "-") {
         try {
             const backupUrl = 'https://www.set.or.th/en/market/index/set/overview';
@@ -100,7 +101,7 @@ module.exports = async (req, res) => {
         } catch (e) {}
     }
 
-    // ၄။ 2D တွက်ချက်ခြင်း
+    // 2D တွက်ချက်ခြင်း
     if (set !== "-") {
         const setLastDigit = set.slice(-1);
         let valueBeforeDecimalDigit = "-";
@@ -120,17 +121,16 @@ module.exports = async (req, res) => {
         set = "--"; value = "--"; twod = "--";
     }
 
-    // ၅။ Redis ကိုသုံးပြီး History စီမံခန့်ခွဲခြင်း လုပ်ငန်းစဉ်
+    // Redis History စီမံခန့်ခွဲခြင်း လုပ်ငန်းစဉ်
     try {
         let latestHistory = await redis.lindex('2d_history_list', 0);
         const hasHistoryInDb = await redis.exists('2d_history_list');
 
-        // [စစ်ဆေးချက် ၁] ရက်အသစ်ရောက်လို့ 'ဖျက်မယ်' ဆိုရင်လည်း Database ထဲမှာ ဒေတာ "ရှိမှသာ" ဖျက်ပါမည်
+        // ရက်အသစ်ရောက်လျှင် ဖျက်ခြင်း (ဒေတာရှိမှ ဖျက်မည်)
         if (timeData.date && latestHistory && latestHistory.date !== timeData.date) {
             if (hasHistoryInDb) {
                 await redis.del('2d_history_list');
             }
-            
             const hasIdInDb = await redis.exists('next_history_id');
             if (hasIdInDb) {
                 await redis.del('next_history_id');
@@ -138,6 +138,7 @@ module.exports = async (req, res) => {
             latestHistory = null;
         }
 
+        // ဒေတာအသစ်သွင်းခြင်း
         if (twod && twod !== "null" && twod !== "--" && twod !== "-") {
             let isDataChanged = true;
 
@@ -166,11 +167,10 @@ module.exports = async (req, res) => {
         historyList = await redis.lrange('2d_history_list', 0, 49);
         hasHistory = historyList.length > 0;
 
-        // Database ထဲရှိ လက်ရှိ Noon/Evening ဒေတာဟောင်းများကို ဖတ်ယူစစ်ဆေးခြင်း
         const storedNoon = await redis.get('noon_result');
         const storedEvening = await redis.get('evening_result');
 
-        // [စစ်ဆေးချက် ၂] ဈေးကွက်ဖွင့်ချိန်တွင် ဒေတာဟောင်းများကို 'ဖျက်မယ်' ဆိုပါကလည်း ဒေတာ "ရှိမှသာ" ဖျက်ပါမည်
+        // ဈေးကွက်ဖွင့်ချိန်တွင် ဒေတာဟောင်းများကို ဖျက်ခြင်း (ဒေတာရှိမှ ဖျက်မည်)
         if (marketStatus !== "Closed") {
             if (storedNoon && timeData.date && storedNoon.date !== timeData.date) {
                 await redis.del('noon_result');
@@ -180,22 +180,20 @@ module.exports = async (req, res) => {
             }
         }
 
-        // ဖျက်ပြီးနောက် နောက်ဆုံးအခြေအနေကို Database ထံမှ ထပ်မံဖတ်ယူခြင်း
+        // နောက်ဆုံးအခြေအနေကို Database မှ ပြန်ဖတ်ခြင်း
         noon_result = await redis.get('noon_result');
         evening_result = await redis.get('evening_result');
 
-        // History List ထဲမှ အချိန်စစ်ပြီး ဒေတာရှာဖွေခြင်း
+        // History List ထဲမှ အချိန်ကိုစစ်ပြီး ဒေတာရှာဖွေခြင်း (မရှိမှသာ သွင်းမည်)
         for (let item of historyList) {
             const itemTime = item.time;
 
             if (itemTime) {
-                // [စစ်ဆေးချက် ၃] ဒေတာ "မရှိမှသာ သွင်းမည်" (Database ရော၊ Variable ထဲမှာပါ မရှိမှ သွင်းပါမည်)
                 if (!noon_result && !storedNoon && itemTime >= "12:01:00" && itemTime <= "12:01:30") {
                     noon_result = item;
                     await redis.set('noon_result', noon_result);
                 }
 
-                // [စစ်ဆေးချက် ၄] ဒေတာ "မရှိမှသာ သွင်းမည်" (Database ရော၊ Variable ထဲမှာပါ မရှိမှ သွင်းပါမည်)
                 if (!evening_result && !storedEvening && itemTime >= "16:30:00" && itemTime <= "16:30:30") {
                     evening_result = item;
                     await redis.set('evening_result', evening_result);
@@ -203,7 +201,7 @@ module.exports = async (req, res) => {
             }
             
             if (noon_result && evening_result) {
-                break;
+                break; // နှစ်ခုလုံးရပြီဆိုလျှင် ရှာဖွေခြင်းကို ချက်ချင်းရပ်မည်
             }
         }
 
@@ -213,9 +211,11 @@ module.exports = async (req, res) => {
         hasHistory = false;
     }
 
-    const finalNoonResult = noon_result ? noon_result : defaultResult;
-    const finalEveningResult = evening_result ? evening_result : defaultResult;
+    // 🌟 [သင်ဖြစ်ချင်သည့်အချက်] - ဒေတာ null ဖြစ်နေရင် defaultResult (-- ပုံစံ) ကို လမ်းကြောင်းလွှဲပြီး အစားထိုးခြင်း
+    const finalNoonResult = (noon_result && noon_result.set) ? noon_result : defaultResult;
+    const finalEveningResult = (evening_result && evening_result.set) ? evening_result : defaultResult;
 
+    // JSON Response ပြန်လည်ပေးပို့ခြင်း
     return res.status(200).json({
         live: {
             data_source: dataSource,
@@ -227,8 +227,8 @@ module.exports = async (req, res) => {
             date: timeData.date,
             time: timeData.time
         },
-        noon_result: finalNoonResult,
-        evening_result: finalEveningResult,
+        noon_result: finalNoonResult,       // <--- စစ်ဆေးပြီးသား နိုင်ငံ့ဂုဏ်ဆောင် ကောင်လေးကို သုံးထားပါတယ်
+        evening_result: finalEveningResult, // <--- စစ်ဆေးပြီးသား နိုင်ငံ့ဂုဏ်ဆောင် ကောင်လေးကို သုံးထားပါတယ်
         hasHistory: hasHistory,
         historyList: historyList
     });
