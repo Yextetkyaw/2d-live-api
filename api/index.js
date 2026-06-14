@@ -23,6 +23,16 @@ module.exports = async (req, res) => {
     let hasHistory = false;
     let historyList = [];
     
+    const defaultResult = {
+        set: "--",
+        value: "--",
+        "2d": "--",
+        datetime: "--",
+        date: "--",
+        time: "--",
+        history_id: "--"
+    };
+
     let noon_result = null;
     let evening_result = null;
 
@@ -113,11 +123,18 @@ module.exports = async (req, res) => {
     // ၅။ Redis ကိုသုံးပြီး History စီမံခန့်ခွဲခြင်း လုပ်ငန်းစဉ်
     try {
         let latestHistory = await redis.lindex('2d_history_list', 0);
+        const hasHistoryInDb = await redis.exists('2d_history_list');
 
-        // [ပြင်ဆင်ချက်] မနက်ဖြန်ရက်အသစ်ရောက်ရင် စာရင်းဟောင်းရော၊ ID Counter ပါ နှစ်ခုလုံးကို ဖျက်ပစ်ခြင်း
+        // [စစ်ဆေးချက် ၁] ရက်အသစ်ရောက်လို့ 'ဖျက်မယ်' ဆိုရင်လည်း Database ထဲမှာ ဒေတာ "ရှိမှသာ" ဖျက်ပါမည်
         if (timeData.date && latestHistory && latestHistory.date !== timeData.date) {
-            await redis.del('2d_history_list'); // ဒေတာစာရင်းဟောင်းကိုဖျက်သည်
-            await redis.del('next_history_id'); // ID မှတ်ထားတဲ့ကောင်ကိုပါ ဖျက်လိုက်သဖြင့် ၁ ကနေ ပြန်စပါမည်
+            if (hasHistoryInDb) {
+                await redis.del('2d_history_list');
+            }
+            
+            const hasIdInDb = await redis.exists('next_history_id');
+            if (hasIdInDb) {
+                await redis.del('next_history_id');
+            }
             latestHistory = null;
         }
 
@@ -149,32 +166,37 @@ module.exports = async (req, res) => {
         historyList = await redis.lrange('2d_history_list', 0, 49);
         hasHistory = historyList.length > 0;
 
-        // ၆။ Noon Result နှင့် Evening Result ကို Status မူတည်ပြီး စစ်ဆေးဖျက်ဆီးခြင်း
+        // Database ထဲရှိ လက်ရှိ Noon/Evening ဒေတာဟောင်းများကို ဖတ်ယူစစ်ဆေးခြင်း
+        const storedNoon = await redis.get('noon_result');
+        const storedEvening = await redis.get('evening_result');
+
+        // [စစ်ဆေးချက် ၂] ဈေးကွက်ဖွင့်ချိန်တွင် ဒေတာဟောင်းများကို 'ဖျက်မယ်' ဆိုပါကလည်း ဒေတာ "ရှိမှသာ" ဖျက်ပါမည်
         if (marketStatus !== "Closed") {
-            const storedNoon = await redis.get('noon_result');
             if (storedNoon && timeData.date && storedNoon.date !== timeData.date) {
                 await redis.del('noon_result');
             }
-
-            const storedEvening = await redis.get('evening_result');
             if (storedEvening && timeData.date && storedEvening.date !== timeData.date) {
                 await redis.del('evening_result');
             }
         }
 
+        // ဖျက်ပြီးနောက် နောက်ဆုံးအခြေအနေကို Database ထံမှ ထပ်မံဖတ်ယူခြင်း
         noon_result = await redis.get('noon_result');
         evening_result = await redis.get('evening_result');
 
+        // History List ထဲမှ အချိန်စစ်ပြီး ဒေတာရှာဖွေခြင်း
         for (let item of historyList) {
             const itemTime = item.time;
 
             if (itemTime) {
-                if (!noon_result && itemTime >= "12:01:00" && itemTime <= "12:01:30") {
+                // [စစ်ဆေးချက် ၃] ဒေတာ "မရှိမှသာ သွင်းမည်" (Database ရော၊ Variable ထဲမှာပါ မရှိမှ သွင်းပါမည်)
+                if (!noon_result && !storedNoon && itemTime >= "12:01:00" && itemTime <= "12:01:30") {
                     noon_result = item;
                     await redis.set('noon_result', noon_result);
                 }
 
-                if (!evening_result && itemTime >= "16:30:00" && itemTime <= "16:30:30") {
+                // [စစ်ဆေးချက် ၄] ဒေတာ "မရှိမှသာ သွင်းမည်" (Database ရော၊ Variable ထဲမှာပါ မရှိမှ သွင်းပါမည်)
+                if (!evening_result && !storedEvening && itemTime >= "16:30:00" && itemTime <= "16:30:30") {
                     evening_result = item;
                     await redis.set('evening_result', evening_result);
                 }
@@ -191,6 +213,9 @@ module.exports = async (req, res) => {
         hasHistory = false;
     }
 
+    const finalNoonResult = noon_result ? noon_result : defaultResult;
+    const finalEveningResult = evening_result ? evening_result : defaultResult;
+
     return res.status(200).json({
         live: {
             data_source: dataSource,
@@ -202,8 +227,8 @@ module.exports = async (req, res) => {
             date: timeData.date,
             time: timeData.time
         },
-        noon_result: noon_result,
-        evening_result: evening_result,
+        noon_result: finalNoonResult,
+        evening_result: finalEveningResult,
         hasHistory: hasHistory,
         historyList: historyList
     });
