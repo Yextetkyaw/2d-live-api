@@ -1,5 +1,6 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+// const db = require('./db'); // သင်၏ Database Client ကို ဤနေရာတွင် Import လုပ်ပါ
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,15 +14,15 @@ module.exports = async (req, res) => {
     let twod = "null";
     let dataSource = "unknown";
     
-    // Result အသစ်များအတွက် Variable သတ်မှတ်ခြင်း
-    let noonResult = null;
-    let eveningResult = null;
+    // Default အနေနဲ့ "--" ဟု သတ်မှတ်ထားမည်
+    let noonResult = "--";
+    let eveningResult = "--";
 
     const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     };
 
-    // Time API ကနေ ဒေတာဆွဲခြင်း
+    // ၁။ Time API ကနေ ဒေတာဆွဲခြင်း
     try {
         const timeResponse = await axios.get('https://time-api-42d.vercel.app/api/time', { timeout: 4000 });
         if (timeResponse.status === 200) {
@@ -33,24 +34,63 @@ module.exports = async (req, res) => {
         }
     } catch (e) {}
 
-    // 2D History API ကနေ Noon နဲ့ Evening ဒေတာများ ဆွဲယူခြင်း
+    const todayDate = timeData.date; // ယနေ့ရက်စွဲ (ဥပမာ- "2026-06-14")
+
+    // ၂။ DATABASE မှ လက်ရှိနေ့ရက်အတွက် ဒေတာ ရှိမရှိ အရင်စစ်ဆေးခြင်း
     try {
-        const historyResponse = await axios.get('https://2d-history-api.vercel.app/', { timeout: 4000 });
-        if (historyResponse.status === 200 && historyResponse.data) {
-            noonResult = historyResponse.data.noon_record_data || null;
-            eveningResult = historyResponse.data.evening_record_data || null;
+        if (todayDate) {
+            // ဥပမာ - db.findOne({ date: todayDate }) ဟု ရှာဖွေခြင်း
+            const savedData = await db.get2DResultByDate(todayDate); 
+            if (savedData) {
+                noonResult = savedData.noon_result || "--";
+                eveningResult = savedData.evening_result || "--";
+            }
         }
     } catch (e) {
-        // API တက်မလာရင် သို့မဟုတ် Timeout ဖြစ်ရင် null အဖြစ်ပဲ ထားရှိပါမယ်
+        console.log("Database read error:", e);
     }
 
-    // နည်းလမ်း (၁) - မူလ Home Page ကနေ ဒေတာဆွဲခြင်း
+    // ၃။ 2D History API ကနေ ဒေတာဆွဲယူပြီး စစ်ဆေးခြင်း
+    try {
+        const historyResponse = await axios.get('https://2d-history-api-six.vercel.app/', { timeout: 4000 });
+        if (historyResponse.status === 200 && historyResponse.data) {
+            
+            const apiNoonData = historyResponse.data.noon_record_data;
+            const apiEveningData = historyResponse.data.evening_record_data;
+
+            let needToSaveDB = false;
+            let updatePayload = {};
+
+            // Noon အတွက် စစ်ဆေးချက်
+            if (noonResult === "--" && apiNoonData !== null && apiNoonData !== undefined) {
+                noonResult = apiNoonData;
+                updatePayload.noon_result = apiNoonData;
+                needToSaveDB = true;
+            }
+
+            // Evening အတွက် စစ်ဆေးချက်
+            if (eveningResult === "--" && apiEveningData !== null && apiEveningData !== undefined) {
+                eveningResult = apiEveningData;
+                updatePayload.evening_result = apiEveningData;
+                needToSaveDB = true;
+            }
+
+            // အကယ်၍ ဒေတာအသစ်ရလာလို့ DB ထဲသိမ်းဖို့ လိုအပ်လာလျှင်
+            if (needToSaveDB && todayDate) {
+                // ဥပမာ - db.updateOne({ date: todayDate }, { $set: updatePayload }, { upsert: true })
+                await db.saveOrUpdate2DResult(todayDate, updatePayload);
+            }
+        }
+    } catch (e) {
+        console.log("API Fetch or DB Write Error:", e);
+    }
+
+    // ၄။ နည်းလမ်း (၁) - မူလ Home Page ကနေ ဒေတာဆွဲခြင်း
     let success = false;
     try {
         const response = await axios.get('https://www.set.or.th/en/home', { headers, timeout: 6000 });
         const $ = cheerio.load(response.data);
 
-        // Home Page ရဲ့ Market Status ကို ယူခြင်း
         $('div.text-black').each((i, el) => {
             const divText = $(el).text();
             if (divText.includes("Market Status")) {
@@ -62,7 +102,6 @@ module.exports = async (req, res) => {
             }
         });
 
-        // Table rows ထဲက SET value ဒေတာ ရှာဖွေခြင်း
         $('tr').each((i, el) => {
             const indexTd = $(el).find('td.title-symbol');
             if (indexTd.length > 0 && indexTd.text().trim() === 'SET') {
@@ -71,7 +110,7 @@ module.exports = async (req, res) => {
                     set = $(tds[1]).text().trim();
                     value = $(tds[4]).text().trim();
                     success = true;
-                    dataSource = "home page"; // Home Page ကရရင် တန်ဖိုးသတ်မှတ်မယ်
+                    dataSource = "home page";
                     return false;
                 }
             }
@@ -87,48 +126,35 @@ module.exports = async (req, res) => {
             const response = await axios.get(backupUrl, { headers, timeout: 6000 });
             const $ = cheerio.load(response.data);
 
-            // SET ကို ယူခြင်း
             const setBox = $('.stock-info, .value.stock-info');
-            if (setBox.length > 0) {
-                set = setBox.first().text().trim();
-            }
+            if (setBox.length > 0) { set = setBox.first().text().trim(); }
 
-            // Status ကို ယူခြင်း
             const statusSpan = $('.quote-market-status span');
-            if (statusSpan.length > 0) {
-                marketStatus = statusSpan.first().text().trim();
-            }
+            if (statusSpan.length > 0) { marketStatus = statusSpan.first().text().trim(); }
 
-            // Value ကို ယူခြင်း
             const valueSpan = $('.quote-market-cost span');
-            if (valueSpan.length > 0) {
-                value = valueSpan.text().trim();
-            }
+            if (valueSpan.length > 0) { value = valueSpan.text().trim(); }
 
-            if (set !== "-" && value !== "-") {
-                dataSource = "set overview"; // Overview Page ကရရင် တန်ဖိုးသတ်မှတ်မယ်
-            }
+            if (set !== "-" && value !== "-") { dataSource = "set overview"; }
         } catch (e) {
-            dataSource = "failed"; // နှစ်ခုလုံးဆွဲမရရင် failed ဖြစ်မယ်
+            dataSource = "failed";
         }
     }
 
     // 2D ဂဏန်း တွက်ချက်ခြင်း
     if (set !== "-") {
-        const setLastDigit = set.slice(-1); // SET ရဲ့ နောက်ဆုံးလုံးကို ယူတယ်
+        const setLastDigit = set.slice(-1);
         let valueBeforeDecimalDigit = "-";
 
-        // Value က "-" မဟုတ်ဘဲ ဒဿမပါဝင်နေတယ်ဆိုရင် ဒဿမရှေ့က တစ်လုံးကို ယူမယ်
         if (value !== "-" && value.includes('.')) {
             const decimalIndex = value.indexOf('.');
             valueBeforeDecimalDigit = value.charAt(decimalIndex - 1);
         }
 
-        // Value က "-" ဖြစ်နေသေးရင် 2D ရဲ့ ဒုတိယလုံးကို "-" လို့ပြမယ်
         if (value === "-") {
-            twod = setLastDigit + "-"; // ဥပမာ - "1-"
+            twod = setLastDigit + "-";
         } else {
-            twod = setLastDigit + valueBeforeDecimalDigit; // ဒေတာစုံရင် "11"
+            twod = setLastDigit + valueBeforeDecimalDigit;
         }
     }
 
@@ -139,7 +165,7 @@ module.exports = async (req, res) => {
         twod = "--";
     }
 
-    // ရလဒ်ကို Live Object အဖြစ် ပေးပို့ခြင်း
+    // ရလဒ်ကို ပေးပို့ခြင်း
     return res.status(200).json({
         live: {
             data_source: dataSource,
