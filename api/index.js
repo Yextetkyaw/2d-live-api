@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
     let hasHistory = false;
     let historyList = [];
     
-    // ဒေတာ မရှိသေးတဲ့အချိန် (null ဖြစ်နေချိန်) မှာ ပြသမည့် Default ပုံစံ
+    // ဒေတာ မရှိသေးတဲ့အချိန်တွင် ပြသမည့် Default ပုံစံ
     const defaultResult = {
         set: "--",
         value: "--",
@@ -138,10 +138,9 @@ module.exports = async (req, res) => {
             latestHistory = null;
         }
 
-        // 🌟 [ပြင်ဆင်ချက်] Value ထဲမှာ ဒဿမအမှတ် (.) ကျိန်းသေပါဝင်ပြီး '-' မဟုတ်မှသာ ဒေတာမှန်ကန်ကြောင်း စစ်ဆေးခြင်း
+        // Value ထဲမှာ ဒဿမအမှတ် (.) ပါဝင်ပြီး '-' မဟုတ်မှသာ ဒေတာအသစ်သွင်းမည်
         const isValidValue = value !== "-" && value !== "--" && value.includes('.');
 
-        // ဒေတာအသစ်သွင်းခြင်း (Value ဒေတာ စိတ်ချရမှုရှိမှသာ သွင်းမည်)
         if (twod && twod !== "null" && twod !== "--" && twod !== "-" && isValidValue) {
             let isDataChanged = true;
 
@@ -187,24 +186,39 @@ module.exports = async (req, res) => {
         noon_result = await redis.get('noon_result');
         evening_result = await redis.get('evening_result');
 
-        // History List ထဲမှ အချိန်ကိုစစ်ပြီး ဒေတာရှာဖွေခြင်း (မရှိမှသာ သွင်းမည်)
-        for (let item of historyList) {
-            const itemTime = item.time;
+        const currentTime = timeData.time;
 
-            if (itemTime) {
-                if (!noon_result && !storedNoon && itemTime >= "12:01:00" && itemTime <= "12:01:30") {
-                    noon_result = item;
-                    await redis.set('noon_result', noon_result);
-                }
+        // 🌟 [ပြင်ဆင်ချက်အသစ်] - လက်ရှိအချိန်နှင့် ဒေတာရှိမရှိ အရင်ဆုံး ချိန်ကိုက်စစ်ဆေးခြင်း
+        const isNoonTimeRange = currentTime && currentTime >= "12:00:50" && currentTime <= "12:01:30";
+        const isEveningTimeRange = currentTime && currentTime >= "16:29:50" && currentTime <= "16:30:30";
 
-                if (!evening_result && !storedEvening && itemTime >= "16:30:00" && itemTime <= "16:30:30") {
-                    evening_result = item;
-                    await redis.set('evening_result', evening_result);
-                }
-            }
+        // မနက်ရော ညနေရော ဒေတာရှိပြီးသားဆိုလျှင်လည်း လုံးဝ (လုံးဝ) ထပ်မစစ်တော့ပါ
+        if (noon_result && evening_result) {
+            // Do nothing
+        } 
+        // မနက်ဒေတာမရှိသေးဘဲ မနက်ပိုင်းအချိန်အပိုင်းအခြားထဲရောက်နေလျှင် (သို့မဟုတ်) ညနေဒေတာမရှိသေးဘဲ ညနေပိုင်းအချိန်အပိုင်းအခြားထဲရောက်နေလျှင်မှသာ ရှာမည်
+        else if ((!noon_result && isNoonTimeRange) || (!evening_result && isEveningTimeRange)) {
             
-            if (noon_result && evening_result) {
-                break; // နှစ်ခုလုံးရပြီဆိုလျှင် ရှာဖွေခြင်းကို ချက်ချင်းရပ်မည်
+            for (let item of historyList) {
+                const itemTime = item.time;
+
+                if (itemTime) {
+                    // မနက်ပိုင်း- လက်ရှိအချိန်က ကိုက်ညီပြီး History ထဲကအချိန်ကလည်း ၁၂:၀၁ အတွင်းဖြစ်လျှင်
+                    if (!noon_result && isNoonTimeRange && itemTime >= "12:01:00" && itemTime <= "12:01:30") {
+                        noon_result = item;
+                        await redis.set('noon_result', noon_result);
+                    }
+
+                    // ညနေပိုင်း- လက်ရှိအချိန်က ကိုက်ညီပြီး History ထဲကအချိန်ကလည်း ၁၆:၃၀ အတွင်းဖြစ်လျှင်
+                    if (!evening_result && isEveningTimeRange && itemTime >= "16:30:00" && itemTime <= "16:30:30") {
+                        evening_result = item;
+                        await redis.set('evening_result', evening_result);
+                    }
+                }
+                
+                if (noon_result && evening_result) {
+                    break;
+                }
             }
         }
 
