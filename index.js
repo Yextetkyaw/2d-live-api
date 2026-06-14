@@ -1,8 +1,5 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
-const { Redis } = require('@upstash/redis');
-
-const redis = Redis.fromEnv(); 
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,15 +12,12 @@ module.exports = async (req, res) => {
     let value = "-";
     let twod = "null";
     let dataSource = "unknown";
-    
-    let noonResult = "--";
-    let eveningResult = "--";
 
     const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     };
 
-    // ၁။ Time API ကနေ ဒေတာဆွဲခြင်း
+    // Time API ကနေ ဒေတာဆွဲခြင်း
     try {
         const timeResponse = await axios.get('https://time-api-42d.vercel.app/api/time', { timeout: 4000 });
         if (timeResponse.status === 200) {
@@ -35,99 +29,7 @@ module.exports = async (req, res) => {
         }
     } catch (e) {}
 
-    const todayDate = timeData.date; // ယနေ့ရက်စွဲ
-
-    // လက်ရှိအချိန်ရဲ့ နာရီနှင့် မိနစ်ကို ခွဲထုတ်ခြင်း (ဥပမာ - 09:01 -> hour: 9, minute: 1)
-    let currentHour = 0;
-    let currentMinute = 0;
-    if (timeData.time) {
-        const timeParts = timeData.time.split(':');
-        currentHour = parseInt(timeParts[0]);
-        currentMinute = parseInt(timeParts[1]);
-    }
-
-    // ၂။ Database ထဲက လက်ရှိဒေတာကို အရင်ဆွဲယူစစ်ဆေးခြင်း
-    if (todayDate) {
-        try {
-            const savedData = await redis.get(`result:${todayDate}`);
-            if (savedData) {
-                noonResult = savedData.noon_result || "--";
-                eveningResult = savedData.evening_result || "--";
-            }
-        } catch (e) {
-            console.error("Redis Read Error:", e.message);
-        }
-    }
-
-    // ၃။ CRON JOB အချိန်အလိုက် လုပ်ဆောင်ချက်များ
-    
-    // (က) မနက်ခင်း ၉:၀၀ မှ ၉:၀၃ အတွင်း - DATA RESET ချခြင်း
-    if (currentHour === 9 && currentMinute >= 0 && currentMinute <= 3) {
-        try {
-            const savedData = await redis.get(`result:${todayDate}`);
-            // ဒေတာ ရှိနေသေးရင် ဖျက်မယ်၊ မရှိတော့ရင် (ဖျက်ပြီးသားဆိုရင်) ဘာမှထပ်မလုပ်တော့ပါ
-            if (savedData) {
-                await redis.del(`result:${todayDate}`);
-                console.log("Cron Job: 9AM Data Reset Successful.");
-            }
-            noonResult = "--";
-            eveningResult = "--";
-        } catch (e) {
-            console.error("Reset Cron Error:", e.message);
-        }
-    }
-
-    // (ခ) နေ့လယ် ၁၂:၀၀ မှ ၁၂:၀၃ အတွင်း - NOON DATA ထည့်ခြင်း
-    if (currentHour === 12 && currentMinute >= 0 && currentMinute <= 3) {
-        // ဒေတာ မရှိသေးဘူး (-- ဖြစ်နေတယ်) ဆိုမှ ရလဒ်ဆွဲပြီး ထည့်မယ်
-        if (noonResult === "--") {
-            try {
-                const historyResponse = await axios.get('https://2d-history-api-six.vercel.app/', { timeout: 4000 });
-                if (historyResponse.status === 200 && historyResponse.data) {
-                    const apiNoonData = historyResponse.data.noon_record_data;
-                    
-                    if (apiNoonData !== null && apiNoonData !== undefined) {
-                        noonResult = apiNoonData;
-                        await redis.set(`result:${todayDate}`, {
-                            noon_result: noonResult,
-                            evening_result: eveningResult
-                        });
-                        console.log("Cron Job: Noon Data Added Successfully.");
-                    }
-                }
-            } catch (e) {
-                console.error("Noon Cron Error:", e.message);
-            }
-        }
-    }
-
-    // (ဂ) ညနေ ၄:၂၉ မှ ၄:၃၂ အတွင်း - EVENING DATA ထည့်ခြင်း
-    // (၁၆ နာရီ ၂၉ မိနစ် မှ ၃၂ မိနစ်အတွင်း ၃ မိနစ်စာ သတ်မှတ်ထားပါသည်)
-    if (currentHour === 16 && currentMinute >= 29 && currentMinute <= 32) {
-        // ဒေတာ မရှိသေးဘူး (-- ဖြစ်နေတယ်) ဆိုမှ ရလဒ်ဆွဲပြီး ထည့်မယ်
-        if (eveningResult === "--") {
-            try {
-                const historyResponse = await axios.get('https://2d-history-api-six.vercel.app/', { timeout: 4000 });
-                if (historyResponse.status === 200 && historyResponse.data) {
-                    const apiEveningData = historyResponse.data.evening_record_data;
-                    
-                    if (apiEveningData !== null && apiEveningData !== undefined) {
-                        eveningResult = apiEveningData;
-                        await redis.set(`result:${todayDate}`, {
-                            noon_result: noonResult,
-                            evening_result: eveningResult
-                        });
-                        console.log("Cron Job: Evening Data Added Successfully.");
-                    }
-                }
-            } catch (e) {
-                console.error("Evening Cron Error:", e.message);
-            }
-        }
-    }
-
-
-    // ၄။ LIVE SET ဒေတာဆွဲခြင်း (အသုံးပြုသူများ ဝင်ကြည့်ချိန် Live ပြသရန်သာ)
+    // LIVE SET ဒေတာဆွဲခြင်း (အသုံးပြုသူများ ဝင်ကြည့်ချိန် Live ပြသရန်သာ)
     let success = false;
     try {
         const response = await axios.get('https://www.set.or.th/en/home', { headers, timeout: 6000 });
