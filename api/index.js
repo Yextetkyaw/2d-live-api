@@ -17,9 +17,9 @@ module.exports = async (req, res) => {
     // Result ဖမ်းမည့်အချိန်များတွင် Cache လုံးဝမလုပ်ဘဲ Live အတိုင်းသွားရန်
     const nowTime = timeData.time; // လက်ရှိအချိန်ကို ယူတယ်
     
-    // နေ့လယ် (12:01 မှ 12:02) နှင့် ညနေ (16:30 မှ 16:31) အတွင်းဖြစ်ပါက Cache မလုပ်ပါ (No Cache)
-    const isNoonResultTime = nowTime && nowTime >= "12:01:00" && nowTime <= "12:02:00";
-    const isEveningResultTime = nowTime && nowTime >= "16:30:00" && nowTime <= "16:31:00";
+    // နေ့လယ် (12:01 မှ 12:03) နှင့် ညနေ (16:30 မှ 16:33) အတွင်းဖြစ်ပါက Cache မလုပ်ပါ (No Cache)
+    const isNoonResultTime = nowTime && nowTime >= "12:01:00" && nowTime <= "12:03:00";
+    const isEveningResultTime = nowTime && nowTime >= "16:30:00" && nowTime <= "16:33:00";
 
     if (isNoonResultTime || isEveningResultTime) {
         // Result ထွက်ရမည့် အရေးကြီးချိန်တွင် Cache လုံးဝပိတ်ပြီး Live တိုက်ရိုက်ဆွဲမည်
