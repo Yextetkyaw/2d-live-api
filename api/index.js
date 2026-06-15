@@ -169,11 +169,11 @@ module.exports = async (req, res) => {
                 };
 
                 await redis.lpush('2d_history_list', newHistoryItem);
-                await redis.ltrim('2d_history_list', 0, 49);
+                await redis.ltrim('2d_history_list', 0, 29);
             }
         }
 
-        historyList = await redis.lrange('2d_history_list', 0, 49);
+        historyList = await redis.lrange('2d_history_list', 0, 29);
         hasHistory = historyList.length > 0;
 
         const storedNoon = await redis.get('noon_result');
@@ -196,8 +196,8 @@ module.exports = async (req, res) => {
         const currentTime = timeData.time;
 
         // 🌟 [မိနစ်အပိုင်းအခြားကို ၂ မိနစ်စာ ပိုကျယ်ပေးထားခြင်း]
-        const isNoonTimeRange = currentTime && currentTime >= "12:01:00" && currentTime <= "12:03:00";
-        const isEveningTimeRange = currentTime && currentTime >= "16:30:00" && currentTime <= "16:32:00";
+        const isNoonTimeRange = currentTime && currentTime >= "12:01:00" && currentTime <= "12:02:00";
+        const isEveningTimeRange = currentTime && currentTime >= "16:30:00" && currentTime <= "16:31:00";
 
         if (noon_result && evening_result) {
             // Do nothing
@@ -209,13 +209,13 @@ module.exports = async (req, res) => {
 
                 if (itemTime) {
                     // မနက်ပိုင်း- History ထဲကအချိန်ကို ကိုက်ညီမှု ရှာဖွေခြင်း
-                    if (!noon_result && isNoonTimeRange && itemTime >= "12:01:00" && itemTime <= "12:03:00") {
+                    if (!noon_result && isNoonTimeRange && itemTime >= "12:01:00" && itemTime <= "12:02:00") {
                         noon_result = item;
                         await redis.set('noon_result', noon_result);
                     }
 
                     // ညနေပိုင်း- History ထဲကအချိန်ကို ကိုက်ညီမှု ရှာဖွေခြင်း
-                    if (!evening_result && isEveningTimeRange && itemTime >= "16:30:00" && itemTime <= "16:32:00") {
+                    if (!evening_result && isEveningTimeRange && itemTime >= "16:30:00" && itemTime <= "16:31:00") {
                         evening_result = item;
                         await redis.set('evening_result', evening_result);
                     }
