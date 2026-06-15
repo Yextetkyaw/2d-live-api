@@ -25,10 +25,6 @@ module.exports = async (req, res) => {
     let hasHistory = false;
     let historyList = [];
     
-    // Variable အသစ်များ တည်ဆောက်ခြင်း
-    let apiStatus = "null";
-    let ifError = "null";
-    
     // ဒေတာ မရှိသေးသည့်အချိန် သို့မဟုတ် Null ဖြစ်နေချိန်တွင် ပြသမည့် Default ပုံစံ
     const defaultResult = {
         set: "--",
@@ -58,9 +54,7 @@ module.exports = async (req, res) => {
                 time: timeResponse.data.time
             };
         }
-    } catch (e) {
-        ifError = "[SECTION 1] Time API Fetch Error: " + e.message;
-    }
+    } catch (e) {}
 
     // [SECTION 2] WEB SCRAPING - ထိုင်း SET Home Page မှ ဒေတာဆွဲခြင်း
     let success = false;
@@ -92,7 +86,6 @@ module.exports = async (req, res) => {
             }
         });
     } catch (e) { 
-        if (ifError === "No Error") ifError = "[SECTION 2] Home Page Scraping Error: " + e.message;
         success = false; 
     }
 
@@ -112,9 +105,7 @@ module.exports = async (req, res) => {
             const valueSpan = $('.quote-market-cost span');
             if (valueSpan.length > 0) value = valueSpan.text().trim();
             dataSource = "set overview";
-        } catch (e) {
-            if (ifError === "No Error") ifError = "[SECTION 3] Overview Page Scraping Error: " + e.message;
-        }
+        } catch (e) {}
     }
 
     // [SECTION 4] 2D DATA CALCULATION - လိုက်ဗ် 2D ဂဏန်းတွက်ချက်ခြင်း
@@ -134,9 +125,7 @@ module.exports = async (req, res) => {
                 twod = setLastDigit + valueBeforeDecimalDigit;
             }
         }
-    } catch (e) {
-        if (ifError === "No Error") ifError = "[SECTION 4] 2D Calculation Error: " + e.message;
-    }
+    } catch (e) {}
     
     // [SECTION 5] MARKET STATUS CONDITIONS - အခြေအနေအလိုက် ဒေတာထိန်းညှိခြင်း
     
@@ -167,8 +156,6 @@ module.exports = async (req, res) => {
                 await redis.del('next_history_id');
             }
             latestHistory = null;
-            // Status (၅) သတ်မှတ်ချက်
-            apiStatus = "( 5 ) History data rested";
         }
 
         // Value ထဲတွင် ဒဿမပါဝင်ပြီး ဒေတာအမှန်ဖြစ်မှသာ ဒေတာအသစ် သွင်းမည်
@@ -207,26 +194,13 @@ module.exports = async (req, res) => {
         const storedNoon = await redis.get('noon_result');
         const storedEvening = await redis.get('evening_result');
 
-        // မနက် ၉:၀၀ တွင် ဈေးကွက်ပြန်ပွင့်ချိန် လိုက်ဗ်ဒေတာနေ့က နေ့လယ်/ညနေ Result အဟောင်းများကို ရှင်းလင်းခြင်း
+        // မနက် ၉:०० တွင် ဈေးကွက်ပြန်ပွင့်ချိန် လိုက်ဗ်ဒေတာနေ့က နေ့လယ်/ညနေ Result အဟောင်းများကို ရှင်းလင်းခြင်း
         if (marketStatus && marketStatus.includes("Pre-Open1")) {
             if (storedNoon && timeData.date && storedNoon.date !== timeData.date) {
                 await redis.del('noon_result');
-                
-                // Result ဖျက်ပြီး History ထဲမှာ data မရှိသေးရင် Status (၁)၊ ရှိရင် Status (၂)
-                if (historyList.length === 0) {
-                    apiStatus = "( 1 ) Result Data rested , History No Data";
-                } else {
-                    apiStatus = "( 2 ) Result Data rested , History Data Claimed";
-                }
             }
             if (storedEvening && timeData.date && storedEvening.date !== timeData.date) {
                 await redis.del('evening_result');
-                
-                if (historyList.length === 0) {
-                    apiStatus = "( 1 ) Result Data rested , History No Data";
-                } else {
-                    apiStatus = "( 2 ) Result Data rested , History Data Claimed";
-                }
             }
         }
 
@@ -269,16 +243,7 @@ module.exports = async (req, res) => {
             }
         }
 
-        // ဒေတာယူပြီးသွားချိန် Status သတ်မှတ်မိနစ်အတွင်း
-        if (noon_result && noon_result.set !== "--" && isNoonTimeRange) {
-            apiStatus = "( 3 ) 12:01 Result Data Saved"; // Status (၃)
-        }
-        if (evening_result && evening_result.set !== "--" && isEveningTimeRange) {
-            apiStatus = "( 4 ) 04:30 Result data saved"; // Status (၄)
-        }
-
     } catch (redisError) {
-        if (ifError === "No Error") ifError = "[SECTION 6] Redis Database Operation Error: " + redisError.message;
         historyList = [];
         hasHistory = false;
     }
@@ -301,8 +266,6 @@ module.exports = async (req, res) => {
         },
         noon_result: finalNoonResult,
         evening_result: finalEveningResult,
-        apiStatus: apiStatus,
-        ifError: ifError,
         hasHistory: hasHistory,
         historyList: historyList
     });
