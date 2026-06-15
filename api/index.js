@@ -180,7 +180,7 @@ module.exports = async (req, res) => {
         const storedEvening = await redis.get('evening_result');
 
         // ဈေးကွက်ဖွင့်ချိန်တွင် ဒေတာဟောင်းများကို ဖျက်ခြင်း (ဒေတာရှိမှ ဖျက်မည်)
-        if (marketStatus !== "Closed") {
+        if (marketStatus && marketStatus.includes("Pre-Open1")) {
             if (storedNoon && timeData.date && storedNoon.date !== timeData.date) {
                 await redis.del('noon_result');
             }
