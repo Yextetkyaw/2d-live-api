@@ -118,13 +118,13 @@ module.exports = async (req, res) => {
         }
     }
     
-    if (marketStatus === "Pre-Open1") {
+    if (marketStatus && marketStatus.includes("Pre-Open1")) {
         if (value.includes('-') || !value.includes('.')) {
     value = "-";
 }
     }
     
-    if (marketStatus === "Closed") {
+    if (marketStatus && marketStatus.includes("Closed")) {
         set = "--"; value = "--"; twod = "--";
     }
 
