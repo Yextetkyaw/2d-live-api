@@ -148,7 +148,7 @@ module.exports = async (req, res) => {
     }
     
     // (ခ) ဈေးကွက်ပိတ်သွားပါက (Closed) လိုက်ဗ်ဒေတာအားလုံးကို "--" သို့ ပြောင်းလဲရန်
-    if (marketStatus === "Closed") {
+    if (marketStatus && marketStatus.includes("Closed")) {
         set = "--"; value = "--"; twod = "--";
     }
 
@@ -167,7 +167,7 @@ module.exports = async (req, res) => {
                 await redis.del('next_history_id');
             }
             latestHistory = null;
-            // 🌟 Status (၅) သတ်မှတ်ချက်
+            // Status (၅) သတ်မှတ်ချက်
             apiStatus = "( 5 ) History data rested";
         }
 
