@@ -1,4 +1,4 @@
-Const axios = require('axios');
+const axios = require('axios');
 const cheerio = require('cheerio');
 const { Redis } = require('@upstash/redis');
 
@@ -53,7 +53,7 @@ module.exports = async (req, res) => {
         }
     } catch (e) {}
 
-    // SET Home Page မှ ဒေတာဆွဲခြင်း
+    // SET Home Page မှ ဒေတာဆွဲခြင်း (Web Scraping ချက်ချင်း ပုံမှန်အလုပ်လုပ်မည်)
     let success = false;
     try {
         const response = await axios.get('https://www.set.or.th/en/home', { headers, timeout: 6000 });
@@ -188,29 +188,27 @@ module.exports = async (req, res) => {
 
         const currentTime = timeData.time;
 
-        // 🌟 [ပြင်ဆင်ချက်အသစ်] - လက်ရှိအချိန်နှင့် ဒေတာရှိမရှိ အရင်ဆုံး ချိန်ကိုက်စစ်ဆေးခြင်း
-        const isNoonTimeRange = currentTime && currentTime >= "12:00:50" && currentTime <= "12:01:30";
-        const isEveningTimeRange = currentTime && currentTime >= "16:29:50" && currentTime <= "16:30:30";
+        // 🌟 [မိနစ်အပိုင်းအခြားကို ၂ မိနစ်စာ ပိုကျယ်ပေးထားခြင်း]
+        const isNoonTimeRange = currentTime && currentTime >= "12:01:00" && currentTime <= "12:03:00";
+        const isEveningTimeRange = currentTime && currentTime >= "16:30:00" && currentTime <= "16:32:00";
 
-        // မနက်ရော ညနေရော ဒေတာရှိပြီးသားဆိုလျှင်လည်း လုံးဝ (လုံးဝ) ထပ်မစစ်တော့ပါ
         if (noon_result && evening_result) {
             // Do nothing
         } 
-        // မနက်ဒေတာမရှိသေးဘဲ မနက်ပိုင်းအချိန်အပိုင်းအခြားထဲရောက်နေလျှင် (သို့မဟုတ်) ညနေဒေတာမရှိသေးဘဲ ညနေပိုင်းအချိန်အပိုင်းအခြားထဲရောက်နေလျှင်မှသာ ရှာမည်
         else if ((!noon_result && isNoonTimeRange) || (!evening_result && isEveningTimeRange)) {
             
             for (let item of historyList) {
                 const itemTime = item.time;
 
                 if (itemTime) {
-                    // မနက်ပိုင်း- လက်ရှိအချိန်က ကိုက်ညီပြီး History ထဲကအချိန်ကလည်း ၁၂:၀၁ အတွင်းဖြစ်လျှင်
-                    if (!noon_result && isNoonTimeRange && itemTime >= "12:01:00" && itemTime <= "12:01:30") {
+                    // မနက်ပိုင်း- History ထဲကအချိန်ကို ကိုက်ညီမှု ရှာဖွေခြင်း
+                    if (!noon_result && isNoonTimeRange && itemTime >= "12:01:00" && itemTime <= "12:03:00") {
                         noon_result = item;
                         await redis.set('noon_result', noon_result);
                     }
 
-                    // ညနေပိုင်း- လက်ရှိအချိန်က ကိုက်ညီပြီး History ထဲကအချိန်ကလည်း ၁၆:၃၀ အတွင်းဖြစ်လျှင်
-                    if (!evening_result && isEveningTimeRange && itemTime >= "16:30:00" && itemTime <= "16:30:30") {
+                    // ညနေပိုင်း- History ထဲကအချိန်ကို ကိုက်ညီမှု ရှာဖွေခြင်း
+                    if (!evening_result && isEveningTimeRange && itemTime >= "16:30:00" && itemTime <= "16:32:00") {
                         evening_result = item;
                         await redis.set('evening_result', evening_result);
                     }
