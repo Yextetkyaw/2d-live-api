@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
     
     // နေ့လယ် (12:01 မှ 12:03) နှင့် ညနေ (16:30 မှ 16:33) အတွင်းဖြစ်ပါက Cache မလုပ်ပါ (No Cache)
     const isNoonResultTime = nowTime && nowTime >= "12:01:00" && nowTime <= "12:03:00";
-    const isEveningResultTime = nowTime && nowTime >= "16:30:00" && nowTime <= "16:33:00";
+    const isEveningResultTime = nowTime && nowTime >= "16:30:00" && nowTime <= "16:32:00";
 
     if (isNoonResultTime || isEveningResultTime) {
         // Result ထွက်ရမည့် အရေးကြီးချိန်တွင် Cache လုံးဝပိတ်ပြီး Live တိုက်ရိုက်ဆွဲမည်
@@ -226,7 +226,7 @@ module.exports = async (req, res) => {
         const currentTime = timeData.time;
 
         // သတ်မှတ်အချိန်အတွင်း ရောက်ပါက History ထဲမှ နေ့လယ်/ညနေ ပိတ်ဂဏန်းကို ရှာဖွေထုတ်ယူခြင်း
-        const isNoonTimeRange = currentTime && currentTime >= "12:01:00" && currentTime <= "12:02:00";
+        const isNoonTimeRange = currentTime && currentTime >= "12:01:00" && currentTime <= "12:03:00";
         const isEveningTimeRange = currentTime && currentTime >= "16:30:00" && currentTime <= "16:32:00";
 
         if (noon_result && evening_result) {
