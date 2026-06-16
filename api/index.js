@@ -73,25 +73,34 @@ module.exports = async (req, res) => {
         res.setHeader('Cache-Control', 's-maxage=5, stale-while-revalidate');
     }
 
-        // [SECTION 1.5] 🌟 Holiday API ရဲ့ offDay နှင့် Time API ရဲ့ today တူမတူ တိုက်ရိုက်စစ်ဆေးခြင်း
+        // [SECTION 1.5] 🌟 Weekend (စနေ/တနင်္ဂနွေ) နှင့် Holiday API ကို တွဲဖက်စစ်ဆေးခြင်း
     try {
-        const holidayResponse = await axios.get('https://2d-holiday-api.vercel.app/api/holidays', { timeout: 4000 });
-        
-        // API နှစ်ခုလုံးဆီက Response ဒေတာတွေ သေချာရရှိမှ စစ်ဆေးမည်
-        if (holidayResponse.status === 200 && holidayResponse.data && timeResponse && timeResponse.data) {
+        // ၁။ ဦးဆုံး Time API ရဲ့ day_of_week ကို ယူပြီး စနေ သို့မဟုတ် တနင်္ဂနွေ ဟုတ်မဟုတ် အရင်စစ်တယ်
+        if (timeResponse && timeResponse.data) {
+            const dayOfWeek = timeResponse.data.day_of_week; // စာသားဖြင့် လာမည် (ဥပမာ- "Saturday")
             
-            const holidayOffDay = holidayResponse.data.offDay; // Holiday API မှ offDay တန်ဖိုး
-            const timeToday = timeResponse.data.today;         // Time API မှ today တန်ဖိုး
+            if (dayOfWeek === "Saturday" || dayOfWeek === "Sunday") {
+                isHoliday = true; // စနေ သို့မဟုတ် တနင်္ဂနွေဖြစ်လျှင် ပိတ်ရက်ဟု သတ်မှတ်
+            }
+        }
+
+        // ၂။ တကယ်လို့ စနေ/တနင်္ဂနွေ မဟုတ်သေးရင်တောင် ထိုင်းအထူးရုံးပိတ်ရက် ဟုတ်မဟုတ် ဆက်စစ်တယ်
+        if (!isHoliday) { 
+            const holidayResponse = await axios.get('https://2d-holiday-api.vercel.app/api/holidays', { timeout: 4000 });
             
-            // သင်အလိုရှိသည့်အတိုင်း တန်ဖိုးနှစ်ခု ကွက်တိ တူညီနေပါက true ဟု သတ်မှတ်မည်
-            if (holidayOffDay && timeToday && holidayOffDay === timeToday) {
-                isHoliday = true;
+            if (holidayResponse.status === 200 && holidayResponse.data && timeResponse && timeResponse.data) {
+                const holidayOffDay = holidayResponse.data.offDay;
+                const timeToday = timeResponse.data.today;
+                
+                if (holidayOffDay && timeToday && holidayOffDay === timeToday) {
+                    isHoliday = true; // အထူးရုံးပိတ်ရက် ဖြစ်နေလျှင်လည်း ပိတ်ရက်ဟု သတ်မှတ်
+                }
             }
         }
     } catch (e) {
-        isHoliday = false; // Holidays API ဒေါင်းနေပါက ပုံမှန်ရက်အဖြစ်ပဲ သတ်မှတ်မည်
+        // API Error တက်ခဲ့ရင်တောင် စနေ/တနင်္ဂနွေ စစ်ချက်က အပေါ်မှာ အရင်အလုပ်လုပ်သွားလို့ စိတ်ချရပါတယ်
     }
-
+    
     // [SECTION 2] WEB SCRAPING - ထိုင်း SET Home Page မှ ဒေတာဆွဲခြင်း
     let success = false;
     try {
