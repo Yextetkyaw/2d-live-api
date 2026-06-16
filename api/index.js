@@ -181,7 +181,7 @@ module.exports = async (req, res) => {
         }
 
         // live ဒေတာ အပြောင်းအလဲရှိပါက History List ထဲသို့ အသစ်တိုးမြှင့်ထည့်သွင်းခြင်း
-        if (twod && twod !== "null" && !twod.includes('-')) {
+        if (twod && twod !== "null" && !twod.includes('-') && !isHoliday) {
             let isDataChanged = true;
 
             if (latestHistory) {
