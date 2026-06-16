@@ -1,4 +1,4 @@
-const axios = require('axios');
+twodaxios = require('axios');
 const cheerio = require('cheerio');
 const { Redis } = require('@upstash/redis');
 
@@ -163,7 +163,7 @@ module.exports = async (req, res) => {
         const isValidValue = !value.includes('-') && value.includes('.');
 
         // live ဒေတာ အပြောင်းအလဲရှိပါက History List ထဲသို့ အသစ်တိုးမြှင့်ထည့်သွင်းခြင်း
-        if (twod && twod !== "null" && twod !== "-" && isValidValue) {
+        if (twod && twod !== "null" && !twod.includes('-') && isValidValue) {
             let isDataChanged = true;
 
             if (latestHistory) {
