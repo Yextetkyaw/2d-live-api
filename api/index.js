@@ -142,19 +142,6 @@ module.exports = async (req, res) => {
         }
     } catch (e) {}
 
-            // 🌟 [SECTION 5] (ခ) ဈေးကွက်အခြေအနေကို စစ်ဆေးပြီး Live ပြသမည့် variable များထဲသို့ ဒေတာထည့်သွင်းခြင်း
-        if (marketStatus && marketStatus.includes("Closed")) {
-            // ဈေးကွက်ပိတ်သော်လည်း `--` မပြောင်းတော့ဘဲ ထိုင်းဆိုက်မှရရှိသည့် နောက်ဆုံးဒေတာအစစ်ကိုသာ တိုက်ရိုက်ပြသမည်
-            set = set;
-            value = value;
-            twod = twod; // (သင်တွက်ချက်ထားသည့် twod variable နာမည်ကို ထည့်ပါ)
-        } else {
-            // ဈေးကွက်ဖွင့်နေချိန် ပုံမှန်အတိုင်း ဒေတာထည့်သွင်းခြင်း
-            set = set;
-            value = value;
-            twod = twod;
-        }
-
     // [SECTION 6] REDIS DATABASE OPERATIONS - ဒေတာဘေ့စ် သိမ်းဆည်း/ထုတ်ယူခြင်း
     try {
         let latestHistory = await redis.lindex('2d_history_list', 0);
