@@ -21,6 +21,7 @@ module.exports = async (req, res) => {
     let value = "null";
     let twod = "null";
     let dataSource = "unknown";
+    let isHoliday = false;
 
     let hasHistory = false;
     let historyList = [];
@@ -44,9 +45,11 @@ module.exports = async (req, res) => {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     };
 
+    let timeResponse;
+    
     // [SECTION 1] TIME API မှ လက်ရှိအချိန် ဒေတာတောင်းယူခြင်း
     try {
-        const timeResponse = await axios.get('https://time-api-42d.vercel.app/api/time', { timeout: 4000 });
+        timeResponse = await axios.get('https://time-api-42d.vercel.app/api/time', { timeout: 4000 });
         if (timeResponse.status === 200) {
             timeData = {
                 datetime: timeResponse.data.formatted_datetime,
@@ -92,7 +95,7 @@ module.exports = async (req, res) => {
                 const tds = $(el).find('td');
                 if (tds.length >= 5) {
                     set = $(tds[1]).text().trim();
-                    value = $(tds[4]).text().trim();
+                    timeResponseesponse = $(tds[4]).text().trim();
                     dataSource = "home Page";
                     success = true;
                     return false;
