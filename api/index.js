@@ -73,19 +73,42 @@ module.exports = async (req, res) => {
         res.setHeader('Cache-Control', 's-maxage=5, stale-while-revalidate');
     }
 
-        // [SECTION 1.5] 🌟 Weekend (စနေ/တနင်္ဂနွေ) နှင့် Holiday API ကို တွဲဖက်စစ်ဆေးခြင်း
+            // [SECTION 1.5] 🌟 Weekend (စနေ/တနင်္ဂနွေ) နှင့် Holiday API ကို တွဲဖက်စစ်ဆေးခြင်း
     try {
-        // ၁။ ဦးဆုံး Time API ရဲ့ day_of_week ကို ယူပြီး စနေ သို့မဟုတ် တနင်္ဂနွေ ဟုတ်မဟုတ် အရင်စစ်တယ်
         if (timeResponse && timeResponse.data) {
-            const dayOfWeek = timeResponse.data.day_of_week; // စာသားဖြင့် လာမည် (ဥပမာ- "Saturday")
+            const dayOfWeek = timeResponse.data.day_of_week; // စာသားဖြင့် လာမည် (ဥပမာ- "Friday")
             
+            // ၁။ ဦးဆုံး စနေ သို့မဟုတ် တနင်္ဂနွေ ဟုတ်မဟုတ် အရင်စစ်တယ်
             if (dayOfWeek === "Saturday" || dayOfWeek === "Sunday") {
-                isHoliday = true; // စနေ သို့မဟုတ် တနင်္ဂနွေဖြစ်လျှင် ပိတ်ရက်ဟု သတ်မှတ်
+                isHoliday = true; 
+            } else {
+                // ၂။ စနေ/တနင်္ဂနွေ မဟုတ်ရင် ထိုင်းအထူးရုံးပိတ်ရက် API ကို လှမ်းခေါ်ပြီး စစ်ဆေးမယ်
+                const holidayResponse = await axios.get('https://2d-holiday-api.vercel.app/api/holidays', { headers, timeout: 4000 });
+                
+                if (holidayResponse.status === 200 && Array.isArray(holidayResponse.data)) {
+                    const holidays = holidayResponse.data;
+                    
+                    // Time API မှ ဒေတာများကို စာလုံးအသေး ပြောင်းခြင်း နှင့် ရှေ့က သုည (0) ဖြုတ်ခြင်း
+                    const timeMonth = timeResponse.data.month_name ? timeResponse.data.month_name.toLowerCase() : "";
+                    const timeDayOfWeek = dayOfWeek ? dayOfWeek.toLowerCase() : "";
+                    const timeDay = timeResponse.data.day ? parseInt(timeResponse.data.day, 10) : null; // 01 ဖြစ်နေရင် 1 ပြောင်းရန်
+
+                    // Holiday List ထဲမှာ ကိုက်ညီတာ ရှိမရှိ Loop ပတ်စစ်ဆေးခြင်း
+                    const matchHoliday = holidays.find(h => {
+                        // Holiday API မှ ဒေတာများကို စာလုံးအသေး ပြောင်းခြင်း နှင့် ရှေ့က သုည (0) ဖြုတ်ခြင်း
+                        const hMonth = h.month ? h.month.toLowerCase() : "";
+                        const hDay = h.day ? h.day.toLowerCase() : "";
+                        const hDate = h.date ? parseInt(h.date, 10) : null; // 01 ဖြစ်နေရင် 1 ပြောင်းရန်
+
+                        return timeMonth === hMonth && timeDay === hDate && timeDayOfWeek === hDay;
+                    });
+
+                    if (matchHoliday) {
+                        isHoliday = true; // အားလုံးကွက်တိကိုက်ညီရင် ပိတ်ရက်ဟု သတ်မှတ်
+                    }
+                }
             }
         }
-
-        // ၂။ တကယ်လို့ စနေ/တနင်္ဂနွေ မဟုတ်သေးရင်တောင် ထိုင်းအထူးရုံးပိတ်ရက် ဟုတ်မဟုတ် ဆက်စစ်တယ်
-        
     } catch (e) {
         // API Error တက်ခဲ့ရင်တောင် စနေ/တနင်္ဂနွေ စစ်ချက်က အပေါ်မှာ အရင်အလုပ်လုပ်သွားလို့ စိတ်ချရပါတယ်
     }
