@@ -83,6 +83,8 @@ try {
         // ၁။ ဦးဆုံး စနေ သို့မဟုတ် တနင်္ဂနွေ ဟုတ်မဟုတ် အရင်စစ်တယ်
         if (dayOfWeek === "Saturday" || dayOfWeek === "Sunday") {
             isHoliday = true;
+            holidayName = "Weekend";
+            offDay = dayOfWeek;
         } else {
             // ၂။ စနေ/တနင်္ဂနွေ မဟုတ်ရင် ထိုင်းအထူးရုံးပိတ်ရက် API ကို လှမ်းခေါ်ပြီး စစ်ဆေးမယ်
             const holidayResponse = await axios.get('https://2d-holiday-api.vercel.app/api/holidays', { headers, timeout: 4000 });
