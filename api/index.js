@@ -208,7 +208,7 @@ module.exports = async (req, res) => {
             latestHistory = null;
         }
 
-        const isNewDataTimeRange = currentTime && currentTime >= "09:29:00" && currentTime <= "16:31:00";
+        const isNewDataTimeRange = currentTime && currentTime >= "09:30:00" && currentTime <= "16:32:00";
         
         if (!isHoliday && isNewDataTimeRange && (twod && twod !== "null") && !twod.includes('-')) {
             let isDataChanged = true;
