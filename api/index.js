@@ -65,9 +65,9 @@ module.exports = async (req, res) => {
     
     const currentTime = timeData.time; // လက်ရှိအချိန်ကို ယူတယ်
     
-    // နေ့လယ် (12:00 မှ 12:02) နှင့် ညနေ (16:29 မှ 16:31) အတွင်းဖြစ်ပါက Cache မလုပ်ပါ (No Cache)
-    const isNoonResultTime = currentTime && currentTime >= "12:00:40" && currentTime <= "12:02:00";
-    const isEveningResultTime = currentTime && currentTime >= "16:29:40" && currentTime <= "16:31:00";
+    // နေ့လယ် (12:00:50 မှ 12:02:00) နှင့် ညနေ (16:29:50 မှ 16:31:00) အတွင်းဖြစ်ပါက Cache မလုပ်ပါ (No Cache)
+    const isNoonResultTime = currentTime && currentTime >= "12:00:50" && currentTime <= "12:02:00";
+    const isEveningResultTime = currentTime && currentTime >= "16:29:50" && currentTime <= "16:31:00";
 
     if (isNoonResultTime || isEveningResultTime) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
